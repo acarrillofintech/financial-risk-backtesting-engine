@@ -2,10 +2,21 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+
+YFINANCE_CACHE_DIRECTORY = (
+    Path(__file__).resolve().parents[1]
+    / ".yfinance_cache"
+)
+
+yf.set_tz_cache_location(
+    str(YFINANCE_CACHE_DIRECTORY)
+)
 
 
 @dataclass(frozen=True)
@@ -22,12 +33,16 @@ class MarketData:
 def _validate_ticker(ticker: str) -> str:
     """Validate and normalize a market ticker."""
     if not isinstance(ticker, str):
-        raise TypeError("Ticker must be a string.")
+        raise TypeError(
+            "Ticker must be a string."
+        )
 
     normalized_ticker = ticker.strip().upper()
 
     if not normalized_ticker:
-        raise ValueError("Ticker cannot be empty.")
+        raise ValueError(
+            "Ticker cannot be empty."
+        )
 
     return normalized_ticker
 
@@ -89,9 +104,16 @@ def _extract_close_prices(
         downloaded_data.columns,
         pd.MultiIndex,
     ):
-        if "Close" not in downloaded_data.columns.get_level_values(0):
+        first_level = (
+            downloaded_data
+            .columns
+            .get_level_values(0)
+        )
+
+        if "Close" not in first_level:
             raise RuntimeError(
-                "Downloaded data does not contain Close prices."
+                "Downloaded data does not contain "
+                "Close prices."
             )
 
         close_data = downloaded_data["Close"]
@@ -103,14 +125,17 @@ def _extract_close_prices(
                 prices = close_data.iloc[:, 0]
             else:
                 raise RuntimeError(
-                    f"Close prices for {ticker} were not found."
+                    f"Close prices for {ticker} "
+                    "were not found."
                 )
         else:
             prices = close_data
+
     else:
         if "Close" not in downloaded_data.columns:
             raise RuntimeError(
-                "Downloaded data does not contain Close prices."
+                "Downloaded data does not contain "
+                "Close prices."
             )
 
         prices = downloaded_data["Close"]
@@ -124,14 +149,18 @@ def _extract_close_prices(
 
     normalized_prices = (
         normalized_prices
-        .replace([np.inf, -np.inf], np.nan)
+        .replace(
+            [np.inf, -np.inf],
+            np.nan,
+        )
         .dropna()
         .sort_index()
     )
 
     if normalized_prices.empty:
         raise RuntimeError(
-            f"No valid closing prices were found for {ticker}."
+            f"No valid closing prices were found "
+            f"for {ticker}."
         )
 
     if np.any(normalized_prices <= 0.0):
@@ -168,7 +197,7 @@ def download_adjusted_prices(
         )
     except Exception as error:
         raise RuntimeError(
-            f"Unable to download market data "
+            "Unable to download market data "
             f"for {normalized_ticker}."
         ) from error
 
@@ -194,12 +223,14 @@ def calculate_simple_returns(
 
     if len(normalized_prices) < 2:
         raise ValueError(
-            "At least two price observations are required."
+            "At least two price observations "
+            "are required."
         )
 
     if normalized_prices.isna().any():
         raise ValueError(
-            "Prices must contain only finite numeric values."
+            "Prices must contain only finite "
+            "numeric values."
         )
 
     price_values = normalized_prices.to_numpy(
@@ -208,7 +239,8 @@ def calculate_simple_returns(
 
     if not np.all(np.isfinite(price_values)):
         raise ValueError(
-            "Prices must contain only finite numeric values."
+            "Prices must contain only finite "
+            "numeric values."
         )
 
     if np.any(price_values <= 0.0):
@@ -216,7 +248,11 @@ def calculate_simple_returns(
             "Prices must be positive."
         )
 
-    returns = normalized_prices.pct_change().dropna()
+    returns = (
+        normalized_prices
+        .pct_change()
+        .dropna()
+    )
 
     returns.name = (
         prices.name
@@ -270,16 +306,17 @@ def main() -> None:
     print("Historical market data")
     print(f"Ticker: {market_data.ticker}")
     print(
-        f"Period: "
+        "Period: "
         f"{market_data.prices.index.min().date()} "
-        f"to {market_data.prices.index.max().date()}"
+        "to "
+        f"{market_data.prices.index.max().date()}"
     )
     print(
-        f"Price observations: "
+        "Price observations: "
         f"{len(market_data.prices):,}"
     )
     print(
-        f"Return observations: "
+        "Return observations: "
         f"{len(market_data.returns):,}"
     )
 
@@ -288,19 +325,19 @@ def main() -> None:
 
     print("\nReturn statistics")
     print(
-        f"Average daily return: "
+        "Average daily return: "
         f"{market_data.returns.mean():.4%}"
     )
     print(
-        f"Daily volatility: "
+        "Daily volatility: "
         f"{market_data.returns.std(ddof=1):.4%}"
     )
     print(
-        f"Worst daily return: "
+        "Worst daily return: "
         f"{market_data.returns.min():.4%}"
     )
     print(
-        f"Best daily return: "
+        "Best daily return: "
         f"{market_data.returns.max():.4%}"
     )
 
